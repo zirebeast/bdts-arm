@@ -49,8 +49,7 @@ Keycloak при первом старте импортирует realm `bdts` (�
 
 HTTP-доступ по IP перенаправляется на HTTPS-имя: вход OIDC с PKCE требует защищённого контекста браузера.
 
-Тестовый стенд: https://arm.gmtry.pw (резервное имя https://37-235-241-108.sslip.io), ВМ Ubuntu 24.04, 4 CPU / 4 ГБ, каталог `/opt/bdts-mvp`.
-Стенд 0.2.0: https://stand1.geometry-dev.ru (ВМ 94.183.236.148, Ubuntu 24.04, 2 CPU / 4 ГБ + swap 4 ГБ, каталог `/opt/bdts-mvp`).
+Тестовый стенд: https://stand1.geometry-dev.ru, ВМ Ubuntu 24.04, 2 CPU / 4 ГБ + swap 4 ГБ, каталог `/opt/bdts-mvp`.
 
 ## Обновление
 

@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from app import security
 from app.config import get_settings
 
-ISS = "https://37-235-241-108.sslip.io/auth/realms/bdts"
+ISS = "https://stand1.geometry-dev.ru/auth/realms/bdts"
 
 
 class _Key:

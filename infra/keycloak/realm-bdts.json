@@ -144,8 +144,6 @@
       "directAccessGrantsEnabled": false,
       "implicitFlowEnabled": false,
       "redirectUris": [
-        "https://37-235-241-108.sslip.io/*",
-        "https://arm.gmtry.pw/*",
         "https://stand1.geometry-dev.ru/*",
         "http://localhost:5173/*"
       ],
@@ -154,7 +152,7 @@
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "https://37-235-241-108.sslip.io/*##https://arm.gmtry.pw/*##https://stand1.geometry-dev.ru/*##http://localhost:5173/*"
+        "post.logout.redirect.uris": "https://stand1.geometry-dev.ru/*##http://localhost:5173/*"
       },
       "fullScopeAllowed": true,
       "protocolMappers": [
@@ -244,28 +242,28 @@
         }
       ],
       "realmRoles": [
-        "BDTS.SOGLTECH",
-        "BDTS.POLEV",
-        "BDTS.SOGLZAD",
-        "BDTS.KAMER",
-        "BDTS.OTVTECHOT",
-        "BDTS.TO_UPLOAD",
         "BDTS.OTVTS",
+        "BDTS.ADMIN",
         "BDTS.ORGWORK",
+        "BDTS.KAMER",
+        "BDTS.SOGLZAD",
+        "BDTS.TO_UPLOAD",
+        "BDTS.POLEV",
+        "BDTS.OTVTECHOT",
         "BDTS.PLANNER",
-        "BDTS.ADMIN"
+        "BDTS.SOGLTECH"
       ],
       "groups": [
-        "/БДТС: Согласование ТО",
-        "/БДТС: Полевые работы",
-        "/БДТС: Согласование задания",
-        "/БДТС: Камеральные работы",
-        "/БДТС: Работа с ТО (ДЭО)",
-        "/БДТС: Загрузка ТО",
         "/БДТС: Контроль ТС (ДЭО)",
+        "/БДТС: Администратор",
         "/БДТС: Организация работ",
+        "/БДТС: Камеральные работы",
+        "/БДТС: Согласование задания",
+        "/БДТС: Загрузка ТО",
+        "/БДТС: Полевые работы",
+        "/БДТС: Работа с ТО (ДЭО)",
         "/БДТС: Планирование",
-        "/БДТС: Администратор"
+        "/БДТС: Согласование ТО"
       ]
     },
     {

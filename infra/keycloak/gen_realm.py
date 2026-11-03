@@ -1,5 +1,5 @@
 """Генерация realm-bdts.json из ролевой модели бэкенда (app.permissions).
-Запуск: python infra/keycloak/gen_realm.py; адреса веб-клиента — из PUBLIC_URLS (через запятую), иначе адреса тестового стенда."""
+Запуск: python infra/keycloak/gen_realm.py; адреса веб-клиента — из PUBLIC_URLS (через запятую), иначе адрес тестового стенда."""
 import json
 import os
 import sys
@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 from app.permissions import DEV_USERS, ROLES  # noqa: E402
 
-HOSTS = [h.strip() for h in os.environ.get("PUBLIC_URLS", "https://37-235-241-108.sslip.io,https://arm.gmtry.pw").split(",") if h.strip()] + ["http://localhost:5173"]
+HOSTS = [h.strip() for h in os.environ.get("PUBLIC_URLS", "https://stand1.geometry-dev.ru").split(",") if h.strip()] + ["http://localhost:5173"]
 
 
 def attr_mapper(name: str) -> dict:
