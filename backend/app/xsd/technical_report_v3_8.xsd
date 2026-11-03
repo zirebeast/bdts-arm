@@ -1,0 +1,1786 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================
+  XSD-схема XML-представления технического отчёта
+  Модель данных: v3.8 (DataModel_v3_8_updates.txt, Dictionaty_v3_8.txt,
+                       dictionaries_seed_v3_8.json)
+  Версия XSD: 1.0 (без xs:assert / xs:alternative — совместима с libxml2, Xerces, .NET)
+  ============================================================================
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tr="urn:gazprom-diagnostics:technical-report:3.8"
+           targetNamespace="urn:gazprom-diagnostics:technical-report:3.8"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified"
+           version="3.8">
+
+  <!-- ====================================================================== -->
+  <!-- 1. БАЗОВЫЕ ПРОСТЫЕ ТИПЫ                                                -->
+  <!-- ====================================================================== -->
+
+  <xs:simpleType name="UuidType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="CodeType">
+    <xs:annotation><xs:documentation>Код записи справочника (PK). Без пробельных символов.
+      Единый тип для всех key/keyref (требование совпадения типов значений).</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:minLength value="1"/>
+      <xs:maxLength value="128"/>
+      <xs:pattern value="\S+"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SourceCodeType">
+    <xs:annotation><xs:documentation>Код записи в системе-источнике КАК СТРОКА (ведущие нули сохраняются).</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:minLength value="1"/>
+      <xs:maxLength value="64"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="NonBlankTextType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[\s\S]*\S[\s\S]*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ShortTextType">
+    <xs:restriction base="xs:token">
+      <xs:minLength value="1"/>
+      <xs:maxLength value="500"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="PositiveDecimalType">
+    <xs:restriction base="xs:decimal"><xs:minExclusive value="0"/></xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="NonNegativeDecimalType">
+    <xs:restriction base="xs:decimal"><xs:minInclusive value="0"/></xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="HbValueType">
+    <xs:annotation><xs:documentation>Твёрдость по Бринеллю, HB.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:integer">
+      <xs:minInclusive value="1"/>
+      <xs:maxInclusive value="999"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="Sha256Type">
+    <xs:restriction base="xs:string"><xs:pattern value="[0-9a-fA-F]{64}"/></xs:restriction>
+  </xs:simpleType>
+
+  <!-- ====================================================================== -->
+  <!-- 2. СКВОЗНЫЕ ПОЛЯ ПРОИСХОЖДЕНИЯ (C-01)                                  -->
+  <!-- ====================================================================== -->
+
+  <xs:simpleType name="SourceSystemType">
+    <xs:annotation><xs:documentation>Одна система или сочетание через «+» для записей,
+      совпавших в двух источниках (например legacy_mvp+asupp).</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="(asupp|ods_tpa|ods_srd_tpo|report_batch|report_to|form_sample|legacy_mvp|manual)(\+(asupp|ods_tpa|ods_srd_tpo|report_batch|report_to|form_sample|legacy_mvp|manual))*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="QualityFlagType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="no_norm_data"/>
+      <xs:enumeration value="lookalike_chars"/>
+      <xs:enumeration value="suspected_typo"/>
+      <xs:enumeration value="hb_weld_ge_300"/>
+      <xs:enumeration value="placeholder_excluded"/>
+      <xs:enumeration value="duplicate_merged"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="QualityFlagsType">
+    <xs:sequence>
+      <xs:element name="quality_flag" type="tr:QualityFlagType" minOccurs="1" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:simpleType name="VerificationStatusType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="confirmed"/>
+      <xs:enumeration value="candidate"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ExportedVerificationStatusType">
+    <xs:annotation><xs:documentation>V-DIC-052: в XML выгружаются только confirmed.</xs:documentation></xs:annotation>
+    <xs:restriction base="tr:VerificationStatusType">
+      <xs:enumeration value="confirmed"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:group name="ProvenanceGroup">
+    <xs:annotation><xs:documentation>Поля происхождения записи справочника (п. 1.1 модели).
+      source_system по умолчанию legacy_mvp (элемент обязателен в выгрузке).</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="source_code" type="tr:SourceCodeType" minOccurs="0"/>
+      <xs:element name="source_system" type="tr:SourceSystemType"/>
+      <xs:element name="quality_flags" type="tr:QualityFlagsType" minOccurs="0"/>
+      <xs:element name="verification_status" type="tr:ExportedVerificationStatusType"/>
+    </xs:sequence>
+  </xs:group>
+
+
+  <xs:group name="ProvenanceStructuralGroup">
+    <xs:annotation><xs:documentation>ОТСТУПЛЕНИЕ ОТ V-DIC-052 (осознанное): узлы-группы Equipment_Types — чисто структурные.
+      Все подтверждённые типы MVP подчинены группам со статусом candidate (asupp_000000003 «Трубопроводная арматура»,
+      asupp_000000001 «Технические устройства»); без их выгрузки parent_code «повисает» и иерархия
+      (V-DIC-042, наследование applies_to_equipment_types[] по предкам, п. 2.3а) теряется.
+      Поэтому группы-предки подтверждённых типов выгружаются с любым статусом. Листья — только confirmed.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="source_code" type="tr:SourceCodeType" minOccurs="0"/>
+      <xs:element name="source_system" type="tr:SourceSystemType"/>
+      <xs:element name="quality_flags" type="tr:QualityFlagsType" minOccurs="0"/>
+      <xs:element name="verification_status" type="tr:VerificationStatusType"/>
+    </xs:sequence>
+  </xs:group>
+
+  <!-- ====================================================================== -->
+  <!-- 3. ПЕРЕЧИСЛЕНИЯ (закрытые справочники и enum-поля модели)              -->
+  <!-- ====================================================================== -->
+
+  <!-- 3.1 Закрытые справочники ведомости (enum по п. 1.3) -->
+  <xs:simpleType name="NoncomplianceCategoryType">
+    <xs:annotation><xs:documentation>Noncompliance_Categories.
+      project_docs, operation_docs → шкала conformity; остальные → fit (default_scale).</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="project_docs"><xs:annotation><xs:documentation>Несоответствия проектной документации</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="operation_docs"><xs:annotation><xs:documentation>Несоответствия эксплуатационной документации</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="structure_defects"><xs:annotation><xs:documentation>Дефекты конструкций</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="ecp_defects"><xs:annotation><xs:documentation>Дефекты средств ЭХЗ</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="electrical_defects"><xs:annotation><xs:documentation>Дефекты электрооборудования</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="functional_defects"><xs:annotation><xs:documentation>Функциональные дефекты</xs:documentation></xs:annotation></xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="AdmissibilityAssessmentType">
+    <xs:annotation><xs:documentation>Admissibility_Assessments. Шкала fit: fit/not_fit; шкала conformity: corresponds/not_corresponds.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="fit"><xs:annotation><xs:documentation>Годен</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="not_fit"><xs:annotation><xs:documentation>Не годен</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="corresponds"><xs:annotation><xs:documentation>Соответствует</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="not_corresponds"><xs:annotation><xs:documentation>Не соответствует</xs:documentation></xs:annotation></xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="BuildingTechnicalStateType">
+    <xs:annotation><xs:documentation>Building_Technical_States, ГОСТ 31937-2011.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="normative"><xs:annotation><xs:documentation>1. Нормативное техническое состояние</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="serviceable"><xs:annotation><xs:documentation>2. Работоспособное техническое состояние</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="limited_serviceable"><xs:annotation><xs:documentation>3. Ограниченно-работоспособное техническое состояние</xs:documentation></xs:annotation></xs:enumeration>
+      <xs:enumeration value="emergency"><xs:annotation><xs:documentation>4. Аварийное состояние</xs:documentation></xs:annotation></xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- 3.2 Enum-поля справочников -->
+  <xs:simpleType name="MaterialKindType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="steel"/><xs:enumeration value="non_ferrous"/><xs:enumeration value="other"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ConflictStateType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/><xs:enumeration value="open"/><xs:enumeration value="resolved"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="PartScopeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="body_cast"/><xs:enumeration value="body_forged"/>
+      <xs:enumeration value="pipe_element"/><xs:enumeration value="weld_haz"/>
+      <xs:enumeration value="bolt"/><xs:enumeration value="nut"/><xs:enumeration value="other"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="AggregationType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="single"/><xs:enumeration value="mean"/>
+      <xs:enumeration value="min"/><xs:enumeration value="max"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="EquipmentCategoryType">
+    <xs:annotation><xs:documentation>Категория типа ЕО. electric_equipment и building остаются в enum
+      (candidate-категории, подтверждены только образцом ведомости и ВДП).</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="valve_armature"/>
+      <xs:enumeration value="pipeline_element"/>
+      <xs:enumeration value="vessel"/>
+      <xs:enumeration value="wellhead_assembly"/>
+      <xs:enumeration value="station_complex"/>
+      <xs:enumeration value="electric_equipment"/>
+      <xs:enumeration value="building"/>
+      <xs:enumeration value="other"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="WorkingMediumCategoryType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="gas"/><xs:enumeration value="liquid"/>
+      <xs:enumeration value="test_medium"/><xs:enumeration value="other"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ControlSchemeUnitType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="points"/><xs:enumeration value="zones"/><xs:enumeration value="surface"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ClimateCategoryType">
+    <xs:restriction base="xs:integer">
+      <xs:minInclusive value="1"/><xs:maxInclusive value="4"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- 3.3 Enum-поля сущностей отчёта -->
+  <xs:simpleType name="ThicknessBasisType">
+    <xs:annotation><xs:documentation>Эталон толщины для V-EQ-018, V-UZT-007, V-CAL-010. Default: nominal.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="nominal"/><xs:enumeration value="calc_min"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SCalcMinSourceType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="calc_sto"/><xs:enumeration value="passport_tu"/><xs:enumeration value="manual_justified"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="EquipmentOriginType">
+    <xs:annotation><xs:documentation>Default: unknown.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="asupp"/><xs:enumeration value="field_created"/><xs:enumeration value="unknown"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SyncStatusType">
+    <xs:annotation><xs:documentation>Default: not_applicable.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="synced"/><xs:enumeration value="pending"/>
+      <xs:enumeration value="conflict"/><xs:enumeration value="not_applicable"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ProtocolNumberingModeType">
+    <xs:annotation><xs:documentation>auto_mask — маска MVP {report_number}-{order:02d} (default);
+      manual — номер вводится вручную, V-P-010 отключается.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="auto_mask"/><xs:enumeration value="manual"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="VolumeKindType">
+    <xs:annotation><xs:documentation>Default: number.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="number"/><xs:enumeration value="percent"/>
+      <xs:enumeration value="by_estimate"/><xs:enumeration value="by_program"/><xs:enumeration value="text"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="PhotoKindType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="eo"/><xs:enumeration value="building_structure"/>
+      <xs:enumeration value="scheme"/><xs:enumeration value="other"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="MethodRunStatusType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="performed"/><xs:enumeration value="not_performed"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="MethodNotPerformedReasonType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="object_not_stopped"/><xs:enumeration value="not_applicable"/>
+      <xs:enumeration value="not_in_scope"/><xs:enumeration value="other"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="StatementStatusType">
+    <xs:annotation><xs:documentation>Default: draft. При issued номер, дата и исполнитель обязательны (V-DS-004).</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="draft"/><xs:enumeration value="issued"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="IdentifierKindType">
+    <xs:annotation><xs:documentation>Вид идентификатора объекта в ведомости дефектов. Default: none.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="factory_no"/><xs:enumeration value="tech_no"/>
+      <xs:enumeration value="reg_no"/><xs:enumeration value="inv_no"/>
+      <xs:enumeration value="km"/><xs:enumeration value="range_km"/><xs:enumeration value="none"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ClockPositionType">
+    <xs:annotation><xs:documentation>Часовая ориентация (расширение мемо): час 1–12 или время ЧЧ:ММ (V-DS-011).</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="(1[0-2]|[1-9])"/>
+      <xs:pattern value="([01]?[0-9]|2[0-3]):[0-5][0-9]"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ====================================================================== -->
+  <!-- 4. ЗАПИСИ СПРАВОЧНИКОВ (содержимое снимков)                            -->
+  <!-- ====================================================================== -->
+
+  <!-- 4.1 Steel_Grades + Steel_Grade_Source_Values (C-02) -->
+  <xs:complexType name="SteelGradeSourceValueType">
+    <xs:annotation><xs:documentation>Steel_Grade_Source_Values: значения одного источника для марки. Служебная, в валидаторах не участвует.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="source_system" type="tr:SourceSystemType"/>
+      <xs:element name="source_code" type="tr:SourceCodeType" minOccurs="0"/>
+      <xs:element name="hb_min" type="tr:HbValueType" minOccurs="0"/>
+      <xs:element name="hb_max" type="tr:HbValueType" minOccurs="0"/>
+      <xs:element name="hb_weld" type="tr:HbValueType" minOccurs="0"/>
+      <xs:element name="sigma" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="steel_class" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="has_norm_data" type="xs:boolean"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SteelGradeType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="standard" type="tr:ShortTextType" minOccurs="0">
+        <xs:annotation><xs:documentation>standard_ref: обязателен для legacy_mvp/confirmed; у импортированных допускается NULL.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="material_kind" type="tr:MaterialKindType" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: steel.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="steel_class" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="has_norm_data" type="xs:boolean" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: true.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="hb_min" type="tr:HbValueType" minOccurs="0"/>
+      <xs:element name="hb_max" type="tr:HbValueType" minOccurs="0"/>
+      <xs:element name="hb_weld_max" type="tr:HbValueType" minOccurs="0"/>
+      <xs:element name="hb_weld_confirmed" type="xs:boolean" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: false. Пока false, hb_weld_max валидаторами не используется.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="tensile_strength_mpa" type="tr:PositiveDecimalType" minOccurs="0"/>
+      <xs:element name="sigma_allowable_mpa" type="tr:PositiveDecimalType" minOccurs="0">
+        <xs:annotation><xs:documentation>Обязателен, если material_kind=steel и has_norm_data=true (V-DIC-044).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="conflict_state" type="tr:ConflictStateType" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: none.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="source_values" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="source_value" type="tr:SteelGradeSourceValueType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 4.2 Equipment_Types (C-04): группы и листья в разных элементах -->
+  <xs:group name="EquipmentTypeHeadGroup">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="parent_code" type="tr:CodeType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:group>
+
+  <xs:group name="EquipmentTypeTailGroup">
+    <xs:sequence>
+      <xs:element name="category" type="tr:EquipmentCategoryType"/>
+      <xs:element name="requires_geometry" type="xs:boolean" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: true. false — типы без DN/PN/толщины.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="purpose" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:group>
+
+  <xs:complexType name="EquipmentTypeGroupNodeType">
+    <xs:annotation><xs:documentation>Узел-группа (is_group=true). В Equipment.equipment_type выбираться не может.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:group ref="tr:EquipmentTypeHeadGroup"/>
+      <xs:element name="is_group" type="xs:boolean" fixed="true"/>
+      <xs:element name="category" type="tr:EquipmentCategoryType"/>
+      <xs:element name="requires_geometry" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="purpose" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:group ref="tr:ProvenanceStructuralGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EquipmentTypeLeafType">
+    <xs:annotation><xs:documentation>Лист иерархии (is_group=false). Допустим как Equipment.equipment_type (V-EQ-032).</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:group ref="tr:EquipmentTypeHeadGroup"/>
+      <xs:element name="is_group" type="xs:boolean" fixed="false" minOccurs="0"/>
+      <xs:element name="has_drive" type="xs:boolean" minOccurs="0">
+        <xs:annotation><xs:documentation>Обязателен для confirmed; для импортированных допускается NULL.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:group ref="tr:EquipmentTypeTailGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 4.3 Equipment_Marks (C-05) -->
+  <xs:complexType name="EquipmentMarkType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="equipment_type_ref" type="tr:CodeType"/>
+      <xs:element name="name" type="tr:ShortTextType">
+        <xs:annotation><xs:documentation>Заглушки («б/н», «н/д», «-», «индивидуальный проект») запрещены (V-DIC-043).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="design_variant_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="source_codes_extra" minOccurs="0">
+        <xs:annotation><xs:documentation>Коды источника объединённых дублей (duplicate_merged).</xs:documentation></xs:annotation>
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="source_code" type="tr:SourceCodeType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 4.4 Climate_Executions (C-06) -->
+  <xs:complexType name="ClimateExecutionType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="full_name" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="category" type="tr:ClimateCategoryType"/>
+      <xs:element name="is_active" type="xs:boolean" minOccurs="0"/>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 4.5 Working_Media (C-07) -->
+  <xs:complexType name="ComponentRefsType">
+    <xs:annotation><xs:documentation>Компоненты набора. Ссылка на несоставную запись (V-DIC-047).</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="component_ref" type="tr:CodeType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="WorkingMediumType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="short_name" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="category" type="tr:WorkingMediumCategoryType"/>
+      <xs:element name="is_active" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="is_composite" type="xs:boolean" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: false.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="component_refs" type="tr:ComponentRefsType" minOccurs="0"/>
+      <xs:element name="components_note" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 4.6 Control_Scheme_Variants, Control_Schemes, Control_Scheme_Files (C-08) -->
+  <xs:complexType name="ControlSchemeVariantType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="equipment_type_ref" type="tr:CodeType"/>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ControlSchemeFileType">
+    <xs:sequence>
+      <xs:element name="file_id" type="tr:UuidType"/>
+      <xs:element name="file_uri" type="xs:anyURI"/>
+      <xs:element name="mime" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="sha256" type="tr:Sha256Type" minOccurs="0"/>
+      <xs:element name="caption" type="tr:ShortTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ControlSchemeType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="variant_ref" type="tr:CodeType"/>
+      <xs:element name="equipment_type_ref" type="tr:CodeType"/>
+      <xs:element name="control_method_ref" type="tr:CodeType"/>
+      <xs:element name="alternative_no" type="xs:positiveInteger" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: 1.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="scheme_name" type="tr:ShortTextType"/>
+      <xs:element name="scheme_caption" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="unit" type="tr:ControlSchemeUnitType" minOccurs="0"/>
+      <xs:element name="points_or_zones_count" type="xs:positiveInteger" minOccurs="0">
+        <xs:annotation><xs:documentation>Для unit ∈ {points, zones} должен быть &gt; 0 (V-DIC-049).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="coverage_note" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="has_file" type="xs:boolean"/>
+      <xs:element name="files" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="file" type="tr:ControlSchemeFileType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 4.7 Hardness_Norms (C-03) -->
+  <xs:complexType name="HardnessNormType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="steel_grade_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="part_scope" type="tr:PartScopeType"/>
+      <xs:element name="ntd_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="hb_min" type="tr:HbValueType"/>
+      <xs:element name="hb_max" type="tr:HbValueType"/>
+      <xs:element name="measurements_per_point" type="xs:positiveInteger" minOccurs="0"/>
+      <xs:element name="aggregation" type="tr:AggregationType" minOccurs="0"/>
+      <xs:element name="note" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 4.8 DTOIR_Work_Types (C-13) -->
+  <xs:complexType name="DtoirWorkTypeType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="source_text" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="is_active" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="is_open" type="xs:boolean" minOccurs="0"/>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 4.9 Chemical_Elements (C-22) [baseline-реконструкция] -->
+  <xs:complexType name="ChemicalElementType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="symbol" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="name" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="order" type="xs:positiveInteger" minOccurs="0"/>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 4.10 НТД (C-21) [baseline-реконструкция + v3.8] -->
+  <xs:complexType name="NtdType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="doc_type" type="tr:ShortTextType">
+        <xs:annotation><xs:documentation>gost, sto_gazprom, rd, fnip и др. (enum из 9 типов в переданных материалах не раскрыт).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="full_name" type="tr:ShortTextType"/>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 4.11 Control_Methods, Appendix_Types (C-20) [baseline + v3.8] -->
+  <xs:complexType name="ControlMethodType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="number_prefix" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="not_applicable_steel_classes" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="steel_class" type="tr:ShortTextType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="AppendixTypeType">
+    <xs:sequence>
+      <xs:element name="code" type="tr:CodeType"/>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:group ref="tr:ProvenanceGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ====================================================================== -->
+  <!-- 5. СНИМКИ СПРАВОЧНИКОВ (Dictionary_Versions, C-01)                     -->
+  <!-- ====================================================================== -->
+
+  <xs:attributeGroup name="SnapshotAttributes">
+    <xs:annotation><xs:documentation>Поля Dictionary_Versions, фиксируемые в контейнере снимка.</xs:documentation></xs:annotation>
+    <xs:attribute name="version" type="tr:ShortTextType" use="required"/>
+    <xs:attribute name="published_at" type="xs:dateTime" use="optional"/>
+    <xs:attribute name="record_count" type="xs:nonNegativeInteger" use="optional"/>
+    <xs:attribute name="checksum" type="tr:ShortTextType" use="optional"/>
+  </xs:attributeGroup>
+
+  <xs:complexType name="DictionarySnapshotsType">
+    <xs:sequence>
+
+      <xs:element name="steel_grades" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="steel_grade" type="tr:SteelGradeType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Steel_Grades"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="hardness_norms" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="hardness_norm" type="tr:HardnessNormType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Hardness_Norms"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="equipment_types" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
+              <xs:element name="equipment_type_group" type="tr:EquipmentTypeGroupNodeType"/>
+              <xs:element name="equipment_type" type="tr:EquipmentTypeLeafType"/>
+            </xs:choice>
+          </xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Equipment_Types"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="equipment_marks" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="equipment_mark" type="tr:EquipmentMarkType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Equipment_Marks"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="climate_executions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="climate_execution" type="tr:ClimateExecutionType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Climate_Executions"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="working_media" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="working_medium" type="tr:WorkingMediumType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Working_Media"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="control_scheme_variants" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="control_scheme_variant" type="tr:ControlSchemeVariantType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Control_Scheme_Variants"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="control_schemes" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="control_scheme" type="tr:ControlSchemeType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Control_Schemes"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="dtoir_work_types" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="dtoir_work_type" type="tr:DtoirWorkTypeType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="DTOIR_Work_Types"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="chemical_elements" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="chemical_element" type="tr:ChemicalElementType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Chemical_Elements"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="ntd_documents" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="ntd" type="tr:NtdType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="НТД"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="control_methods" minOccurs="0">
+        <xs:annotation><xs:documentation>Control_Methods: по каталогу привязка enum (только confirmed). В переданном seed полный список
+          confirmed-методов (22) отсутствует, поэтому проверка членства реализована через key/keyref на этот снимок.</xs:documentation></xs:annotation>
+        <xs:complexType>
+          <xs:sequence><xs:element name="control_method" type="tr:ControlMethodType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Control_Methods"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="appendix_types" minOccurs="0">
+        <xs:annotation><xs:documentation>Appendix_Types: см. примечание к control_methods (25 confirmed в seed не переданы).</xs:documentation></xs:annotation>
+        <xs:complexType>
+          <xs:sequence><xs:element name="appendix_type" type="tr:AppendixTypeType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+          <xs:attribute name="dictionary_code" type="tr:CodeType" use="required" fixed="Appendix_Types"/>
+          <xs:attributeGroup ref="tr:SnapshotAttributes"/>
+        </xs:complexType>
+      </xs:element>
+
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ====================================================================== -->
+  <!-- 6. ШАПКА ОТЧЁТА, УЧАСТНИКИ, ПРИБОРЫ [baseline-реконструкция + C-01/C-19]-->
+  <!-- ====================================================================== -->
+
+  <xs:complexType name="OrganizationType">
+    <xs:sequence>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="inn" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="address" type="tr:ShortTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="OpoType">
+    <xs:sequence>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="registration_number" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="opo_hazard_class" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="opo_type" type="tr:ShortTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="DictionaryVersionRefType">
+    <xs:annotation><xs:documentation>Report.dictionary_versions[]: по какой версии справочников составлен отчёт.
+      Пара (dictionary_code, version) должна совпадать с атрибутами контейнера снимка (keyref).</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="dictionary_code" type="tr:CodeType"/>
+      <xs:element name="version" type="tr:ShortTextType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ReportType">
+    <xs:sequence>
+      <xs:element name="report_id" type="tr:UuidType"/>
+      <xs:element name="report_number" type="tr:ShortTextType"/>
+      <xs:element name="report_date" type="xs:date"/>
+      <xs:element name="report_title" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="profile" type="tr:CodeType">
+        <xs:annotation><xs:documentation>Report_Profiles: to_tpa, to_vessel, to_wellhead, to_grs, … (список расширяемый, 5+).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="protocol_numbering_mode" type="tr:ProtocolNumberingModeType" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: auto_mask.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="survey_year" type="xs:gYear" minOccurs="0"/>
+      <xs:element name="opo" type="tr:OpoType" minOccurs="0"/>
+      <xs:element name="customer" type="tr:OrganizationType" minOccurs="0"/>
+      <xs:element name="executor" type="tr:OrganizationType" minOccurs="0"/>
+      <xs:element name="dictionary_versions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dictionary_version" type="tr:DictionaryVersionRefType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="applied_ntd" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="ntd_ref" type="tr:CodeType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SpecialistCertificationType">
+    <xs:sequence>
+      <xs:element name="method_ref" type="tr:CodeType">
+        <xs:annotation><xs:documentation>NDT_Qualification_Methods (привязка в XSD — нет).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="level" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="certificate_number" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="valid_until" type="xs:date" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SpecialistType">
+    <xs:sequence>
+      <xs:element name="specialist_id" type="tr:UuidType"/>
+      <xs:element name="full_name" type="tr:ShortTextType"/>
+      <xs:element name="position" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="certifications" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="certification" type="tr:SpecialistCertificationType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="InstrumentType">
+    <xs:sequence>
+      <xs:element name="instrument_id" type="tr:UuidType"/>
+      <xs:element name="instrument_type_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="serial_number" type="tr:ShortTextType">
+        <xs:annotation><xs:documentation>Заводской номер прибора — обязательный (в т. ч. в спектральном протоколе).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="verification_status_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="verification_certificate" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="verification_valid_until" type="xs:date" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ReviewedDocumentType">
+    <xs:sequence>
+      <xs:element name="document_type_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="title" type="tr:ShortTextType"/>
+      <xs:element name="number" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="date" type="xs:date" minOccurs="0"/>
+      <xs:element name="doc_status" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ====================================================================== -->
+  <!-- 7. ОБЪЁМ РАБОТ (C-17)                                                  -->
+  <!-- ====================================================================== -->
+
+  <xs:complexType name="WorkItemType">
+    <xs:sequence>
+      <xs:element name="work_name" type="tr:ShortTextType"/>
+      <xs:element name="control_method_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="volume_kind" type="tr:VolumeKindType" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: number. volume_value и volume_unit_ref обязательны при number/percent (V-R-017).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="volume_value" type="tr:PositiveDecimalType" minOccurs="0"/>
+      <xs:element name="volume_unit_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="volume_text" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="volume_planned" type="tr:NonNegativeDecimalType" minOccurs="0"/>
+      <xs:element name="volume_fact" type="tr:NonNegativeDecimalType" minOccurs="0"/>
+      <xs:element name="in_estimate" type="xs:boolean" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: true. false — контроль добавлен сверх сметы.</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ====================================================================== -->
+  <!-- 8. ЕДИНИЦЫ ОБОРУДОВАНИЯ (C-04..C-10, C-18)                             -->
+  <!-- ====================================================================== -->
+
+  <xs:complexType name="WorkingMediumRefsType">
+    <xs:annotation><xs:documentation>Equipment.working_mediums[] — множественный выбор. Набор и его компонент одновременно — предупреждение V-EQ-031.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="working_medium_ref" type="tr:CodeType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EquipmentType">
+    <xs:sequence>
+      <xs:element name="eo_uid" type="tr:UuidType"/>
+      <xs:element name="asupp_eo_id" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="origin" type="tr:EquipmentOriginType" minOccurs="0"/>
+      <xs:element name="sync_status" type="tr:SyncStatusType" minOccurs="0"/>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="equipment_type" type="tr:CodeType">
+        <xs:annotation><xs:documentation>Только лист иерархии Equipment_Types (V-EQ-032) — keyref на ключ листьев.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="type_mark" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="mark_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="factory_number" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="position_label" type="tr:ShortTextType" minOccurs="0">
+        <xs:annotation><xs:documentation>Позиционное обозначение детали («Задвижка 1.1»), когда заводского № нет.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="manufacture_year" type="xs:gYear" minOccurs="0"/>
+      <xs:element name="location" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="climate_execution" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="climate_execution_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="drive_type" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="has_drive" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="connection_type" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="gate_tightness" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="dn_mm" type="tr:PositiveDecimalType" minOccurs="0"/>
+      <xs:element name="pn_mpa" type="tr:PositiveDecimalType" minOccurs="0"/>
+      <xs:element name="working_mediums" type="tr:WorkingMediumRefsType" minOccurs="0"/>
+      <xs:element name="steel_grade_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="s_nominal_mm" type="tr:PositiveDecimalType" minOccurs="0"/>
+      <xs:element name="s_nominal_source" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="s_calc_min_mm" type="tr:PositiveDecimalType" minOccurs="0"/>
+      <xs:element name="s_calc_min_source" type="tr:SCalcMinSourceType" minOccurs="0"/>
+      <xs:element name="s_calc_min_justification" type="tr:NonBlankTextType" minOccurs="0">
+        <xs:annotation><xs:documentation>Обязательно при s_calc_min_source = manual_justified (V-EQ-030).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="thickness_basis" type="tr:ThicknessBasisType" minOccurs="0"/>
+      <xs:element name="uzt_scheme_zones" type="xs:positiveInteger" minOccurs="0"/>
+      <xs:element name="hardness_scheme_zones" type="xs:positiveInteger" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EquipmentControlSchemeType">
+    <xs:annotation><xs:documentation>Equipment_Control_Schemes (C-08, п. 2.10).</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="eo_uid" type="tr:UuidType"/>
+      <xs:element name="control_method_ref" type="tr:CodeType"/>
+      <xs:element name="scheme_ref" type="tr:CodeType" minOccurs="0">
+        <xs:annotation><xs:documentation>NULL — схема не из справочника.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="point_labels" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="point_label" type="tr:ShortTextType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="has_extra_points" type="xs:boolean" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: false.</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="MethodStatusType">
+    <xs:annotation><xs:documentation>Report_Method_Status (C-16). not_performed ⇒ протокол метода не формируется (V-MS-001);
+      reason обязателен (V-MS-002); reason=other ⇒ reason_text обязателен.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="method_ref" type="tr:CodeType"/>
+      <xs:element name="eo_uid" type="tr:UuidType" minOccurs="0"/>
+      <xs:element name="status" type="tr:MethodRunStatusType"/>
+      <xs:element name="reason" type="tr:MethodNotPerformedReasonType" minOccurs="0"/>
+      <xs:element name="reason_text" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:element name="act_note" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ====================================================================== -->
+  <!-- 9. ПРОТОКОЛЫ И ПРИЛОЖЕНИЯ                                              -->
+  <!-- ====================================================================== -->
+
+  <xs:complexType name="UuidRefListType">
+    <xs:sequence><xs:element name="ref" type="tr:UuidType" maxOccurs="unbounded"/></xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="CodeRefListType">
+    <xs:sequence><xs:element name="ref" type="tr:CodeType" maxOccurs="unbounded"/></xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ProtocolMetadataType">
+    <xs:sequence>
+      <xs:element name="protocol_number" type="tr:ShortTextType">
+        <xs:annotation><xs:documentation>При auto_mask — {report_number}-{order:02d} (V-P-010); при manual — произвольный
+          (напр. АТД-2023-ГТСПБ-ПСК-ГРС-000013844).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="order" type="xs:positiveInteger"/>
+      <xs:element name="protocol_date" type="xs:date" minOccurs="0"/>
+      <xs:element name="appendix_label" type="tr:ShortTextType" minOccurs="0">
+        <xs:annotation><xs:documentation>«Приложение 4» / «Приложение Б» (C-19).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="instrument_refs" type="tr:UuidRefListType" minOccurs="0"/>
+      <xs:element name="specialist_refs" type="tr:UuidRefListType" minOccurs="0"/>
+      <xs:element name="ntd_refs" type="tr:CodeRefListType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Расположение точки замера: хотя бы одно из zone_number / point_label (V-UZT-009, V-HRD-011) -->
+  <xs:group name="MeasurementLocationGroup">
+    <xs:choice>
+      <xs:sequence>
+        <xs:element name="zone_number" type="xs:positiveInteger"/>
+        <xs:element name="point_label" type="tr:ShortTextType" minOccurs="0"/>
+      </xs:sequence>
+      <xs:element name="point_label" type="tr:ShortTextType"/>
+    </xs:choice>
+  </xs:group>
+
+  <!-- 9.1 УЗТ (C-09, C-10) -->
+  <xs:complexType name="UztMeasurementType">
+    <xs:sequence>
+      <xs:group ref="tr:MeasurementLocationGroup"/>
+      <xs:element name="section_label" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="s_nominal_section_mm" type="tr:PositiveDecimalType" minOccurs="0"/>
+      <xs:element name="s_measured_mm" type="tr:PositiveDecimalType"/>
+      <xs:element name="s_min_measured_mm" type="tr:PositiveDecimalType" minOccurs="0"/>
+      <xs:element name="is_extra_point" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EquipmentUztDataType">
+    <xs:sequence>
+      <xs:element name="eo_ref" type="tr:UuidType"/>
+      <xs:element name="measurements">
+        <xs:complexType>
+          <xs:sequence><xs:element name="measurement" type="tr:UztMeasurementType" maxOccurs="unbounded"/></xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="assessment_result" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 9.2 Твёрдость (C-03, C-09) -->
+  <xs:complexType name="RawHbValuesType">
+    <xs:sequence><xs:element name="raw_hb_value" type="tr:HbValueType" maxOccurs="unbounded"/></xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="HardnessMeasurementType">
+    <xs:sequence>
+      <xs:group ref="tr:MeasurementLocationGroup"/>
+      <xs:element name="section_label" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="is_extra_point" type="xs:boolean" minOccurs="0"/>
+      <!-- Норма: из Hardness_Norms ИЛИ ручная (оба предела + НТД); если нет — по марке стали (V-HRD-008, V-HRD-012) -->
+      <xs:choice minOccurs="0">
+        <xs:element name="norm_ref" type="tr:CodeType"/>
+        <xs:sequence>
+          <xs:element name="hb_min_override" type="tr:HbValueType"/>
+          <xs:element name="hb_max_override" type="tr:HbValueType"/>
+          <xs:element name="override_ntd_ref" type="tr:CodeType"/>
+        </xs:sequence>
+      </xs:choice>
+      <!-- Исходные замеры; aggregation_applied допустим только вместе с ними (V-HRD-013) -->
+      <xs:sequence minOccurs="0">
+        <xs:element name="raw_hb_values" type="tr:RawHbValuesType"/>
+        <xs:element name="aggregation_applied" type="tr:AggregationType" minOccurs="0"/>
+      </xs:sequence>
+      <xs:element name="avg_hb_value" type="xs:decimal">
+        <xs:annotation><xs:documentation>Поле результата (сохранено из MVP).</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EquipmentHardnessDataType">
+    <xs:sequence>
+      <xs:element name="eo_ref" type="tr:UuidType"/>
+      <xs:element name="part_scope" type="tr:PartScopeType" minOccurs="0"/>
+      <xs:element name="measurements">
+        <xs:complexType>
+          <xs:sequence><xs:element name="measurement" type="tr:HardnessMeasurementType" maxOccurs="unbounded"/></xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="assessment_result" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- 9.3 ВИК, МПК, УЗК, спектр, прочие [baseline-реконструкция] -->
+  <xs:complexType name="DefectRecordType">
+    <xs:sequence>
+      <xs:element name="category_code" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="description" type="tr:NonBlankTextType"/>
+      <xs:element name="location" type="tr:ShortTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="DefectRecordsType">
+    <xs:sequence><xs:element name="defect" type="tr:DefectRecordType" maxOccurs="unbounded"/></xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EquipmentVikDataType">
+    <xs:sequence>
+      <xs:element name="eo_ref" type="tr:UuidType"/>
+      <xs:element name="status_template" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="defects" type="tr:DefectRecordsType" minOccurs="0"/>
+      <xs:element name="assessment_result" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EquipmentMpkDataType">
+    <xs:sequence>
+      <xs:element name="eo_ref" type="tr:UuidType"/>
+      <xs:element name="mpk_method_code" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="magnetization_type_code" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="magnet_source_code" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="sensitivity_level_code" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="result_template_code" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="defects" type="tr:DefectRecordsType" minOccurs="0"/>
+      <xs:element name="assessment_result" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EquipmentUzkMetalDataType">
+    <xs:sequence>
+      <xs:element name="eo_ref" type="tr:UuidType"/>
+      <xs:element name="area_code" type="tr:CodeType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="result_status_code" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="defects" type="tr:DefectRecordsType" minOccurs="0"/>
+      <xs:element name="assessment_result" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EquipmentUzkWeldDataType">
+    <xs:sequence>
+      <xs:element name="eo_ref" type="tr:UuidType"/>
+      <xs:element name="weld_label" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="pep_matrix_code" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="result_code" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="defects" type="tr:DefectRecordsType" minOccurs="0"/>
+      <xs:element name="assessment_result" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ChemicalMeasurementType">
+    <xs:sequence>
+      <xs:element name="element_ref" type="tr:CodeType"/>
+      <xs:element name="value_percent" type="tr:NonNegativeDecimalType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EquipmentSpectralDataType">
+    <xs:sequence>
+      <xs:element name="eo_ref" type="tr:UuidType"/>
+      <xs:element name="point_label" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="identified_steel_grade_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="measurements">
+        <xs:complexType>
+          <xs:sequence><xs:element name="measurement" type="tr:ChemicalMeasurementType" maxOccurs="unbounded"/></xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="assessment_result" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ParameterType">
+    <xs:sequence>
+      <xs:element name="name" type="tr:ShortTextType"/>
+      <xs:element name="value" type="xs:string"/>
+      <xs:element name="unit" type="tr:ShortTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="GenericEquipmentResultType">
+    <xs:sequence>
+      <xs:element name="eo_ref" type="tr:UuidType" minOccurs="0"/>
+      <xs:element name="medium_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="result_code" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="assessment_result" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="parameters" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="parameter" type="tr:ParameterType" maxOccurs="unbounded"/></xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="comment" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ProtocolDataType">
+    <xs:choice>
+      <xs:element name="uzt_data">
+        <xs:complexType><xs:sequence><xs:element name="equipment_uzt_data" type="tr:EquipmentUztDataType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="hardness_data">
+        <xs:complexType><xs:sequence><xs:element name="equipment_hardness_data" type="tr:EquipmentHardnessDataType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="vik_data">
+        <xs:complexType><xs:sequence><xs:element name="equipment_vik_data" type="tr:EquipmentVikDataType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="mpk_data">
+        <xs:complexType><xs:sequence><xs:element name="equipment_mpk_data" type="tr:EquipmentMpkDataType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="uzk_metal_data">
+        <xs:complexType><xs:sequence><xs:element name="equipment_uzk_metal_data" type="tr:EquipmentUzkMetalDataType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="uzk_weld_data">
+        <xs:complexType><xs:sequence><xs:element name="equipment_uzk_weld_data" type="tr:EquipmentUzkWeldDataType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="spectral_data">
+        <xs:complexType><xs:sequence><xs:element name="equipment_spectral_data" type="tr:EquipmentSpectralDataType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="generic_data">
+        <xs:annotation><xs:documentation>Прочие методы и приложения (ПВК, расчёт, ФД, вибродиагностика и др.), структура которых не передана в материалах v3.8.</xs:documentation></xs:annotation>
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="equipment_result" type="tr:GenericEquipmentResultType" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:any namespace="##other" processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:choice>
+  </xs:complexType>
+
+  <xs:complexType name="ProtocolType">
+    <xs:sequence>
+      <xs:element name="protocol_id" type="tr:UuidType"/>
+      <xs:element name="control_method_ref" type="tr:CodeType"/>
+      <xs:element name="appendix_type_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="metadata" type="tr:ProtocolMetadataType"/>
+      <xs:element name="data" type="tr:ProtocolDataType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ====================================================================== -->
+  <!-- 10. ВЕДОМОСТЬ ВЫЯВЛЕННЫХ ДЕФЕКТОВ (C-11, C-12, C-13)                   -->
+  <!-- ====================================================================== -->
+
+  <xs:complexType name="DefectDimensionsType">
+    <xs:annotation><xs:documentation>Размеры дефекта. «-» в форме вывода = отсутствие элемента (NULL).</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="length_mm" type="tr:NonNegativeDecimalType" minOccurs="0"/>
+      <xs:element name="width_mm" type="tr:NonNegativeDecimalType" minOccurs="0"/>
+      <xs:element name="depth_mm" type="tr:NonNegativeDecimalType" minOccurs="0"/>
+      <xs:element name="note" type="tr:ShortTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="DefectsStatementItemType">
+    <xs:sequence>
+      <xs:element name="item_no" type="xs:positiveInteger"/>
+      <xs:element name="noncompliance_category" type="tr:NoncomplianceCategoryType"/>
+      <xs:element name="object_name" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="identifier_kind" type="tr:IdentifierKindType" minOccurs="0"/>
+      <xs:element name="object_identifier" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="km_from" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="km_to" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="eo_uid" type="tr:UuidType" minOccurs="0"/>
+      <xs:element name="defect_description" type="tr:NonBlankTextType"/>
+      <xs:element name="dimensions" type="tr:DefectDimensionsType" minOccurs="0"/>
+      <xs:element name="admissibility" type="tr:AdmissibilityAssessmentType">
+        <xs:annotation><xs:documentation>Шкала должна соответствовать default_scale категории (V-DS-005, предупреждение).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="measures" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:element name="note" type="tr:NonBlankTextType" minOccurs="0"/>
+      <!-- Расширения мемо: вне формы заказчика, необязательны (OQ-06) -->
+      <xs:element name="location_text" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="coord_x" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="coord_y" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="coord_z" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="clock_position" type="tr:ClockPositionType" minOccurs="0"/>
+      <xs:element name="detected" type="xs:boolean" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="DefectsStatementType">
+    <xs:sequence>
+      <xs:element name="statement_id" type="tr:UuidType"/>
+      <xs:element name="statement_status" type="tr:StatementStatusType" minOccurs="0"/>
+      <xs:element name="statement_number" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="statement_date" type="xs:date" minOccurs="0"/>
+      <xs:element name="order_number" type="tr:ShortTextType" minOccurs="0">
+        <xs:annotation><xs:documentation>Номер распоряжения АО «Газпром диагностика» (в образце пуст).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="order_date" type="xs:date" minOccurs="0"/>
+      <xs:element name="technical_report_number" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="repair_object_code" type="tr:ShortTextType" minOccurs="0">
+        <xs:annotation><xs:documentation>Формат (три числовых сегмента через «/») — мягкая проверка V-DS-008, в XSD не жёсткая.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="repair_object_name" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="survey_year" type="xs:gYear" minOccurs="0"/>
+      <xs:element name="dtoir_work_type_ref" type="tr:CodeType">
+        <xs:annotation><xs:documentation>Основной вид работ. Дополнительные — в work_types (N:M, Defects_Statement_Work_Types).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="work_types" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="dtoir_work_type_ref" type="tr:CodeType" maxOccurs="unbounded"/></xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="compiler_name" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="compiler_position" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="compiler_specialist_ref" type="tr:UuidType" minOccurs="0"/>
+      <xs:element name="items">
+        <xs:complexType>
+          <xs:sequence><xs:element name="item" type="tr:DefectsStatementItemType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ====================================================================== -->
+  <!-- 11. ВЕДОМОСТЬ ДЕФЕКТОВ И ПОВРЕЖДЕНИЙ ЗиС (C-14)                        -->
+  <!-- ====================================================================== -->
+
+  <xs:complexType name="BuildingDefectsItemType">
+    <xs:sequence>
+      <xs:element name="item_no" type="xs:positiveInteger"/>
+      <xs:element name="construction" type="tr:ShortTextType"/>
+      <xs:element name="position_in_axes" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="no_defects" type="xs:boolean" minOccurs="0">
+        <xs:annotation><xs:documentation>Default: false. «ДНО» — конструкция без дефектов.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="defect_description" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:element name="possible_cause" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:element name="construction_state_ref" type="tr:BuildingTechnicalStateType"/>
+      <xs:element name="consequences" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:element name="measures" type="tr:NonBlankTextType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="BuildingDefectsStatementType">
+    <xs:sequence>
+      <xs:element name="bds_id" type="tr:UuidType"/>
+      <xs:element name="number" type="tr:ShortTextType"/>
+      <xs:element name="date" type="xs:date"/>
+      <xs:element name="ntd_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="overall_state_ref" type="tr:BuildingTechnicalStateType"/>
+      <xs:element name="conclusion" type="tr:NonBlankTextType" minOccurs="0"/>
+      <xs:element name="items">
+        <xs:complexType>
+          <xs:sequence><xs:element name="item" type="tr:BuildingDefectsItemType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ====================================================================== -->
+  <!-- 12. ФОТО, ЗАКЛЮЧЕНИЯ, ПОДПИСИ                                          -->
+  <!-- ====================================================================== -->
+
+  <xs:complexType name="PhotoType">
+    <xs:sequence>
+      <xs:element name="photo_id" type="tr:UuidType"/>
+      <xs:element name="photo_kind" type="tr:PhotoKindType"/>
+      <xs:element name="eo_uid" type="tr:UuidType" minOccurs="0">
+        <xs:annotation><xs:documentation>Обязателен при photo_kind = eo (V-PH-001).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="subject_text" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="method_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="appendix_type" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="repair_object_code" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="file_uri" type="xs:anyURI"/>
+      <xs:element name="sha256" type="tr:Sha256Type"/>
+      <xs:element name="mime" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="caption" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="taken_at" type="xs:dateTime" minOccurs="0"/>
+      <xs:element name="order" type="xs:positiveInteger" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ConclusionType">
+    <xs:sequence>
+      <xs:element name="method_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="technical_state_ref" type="tr:CodeType" minOccurs="0"/>
+      <xs:element name="text" type="tr:NonBlankTextType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SignatureType">
+    <xs:sequence>
+      <xs:element name="role" type="tr:ShortTextType"/>
+      <xs:element name="specialist_ref" type="tr:UuidType" minOccurs="0"/>
+      <xs:element name="full_name" type="tr:ShortTextType"/>
+      <xs:element name="position" type="tr:ShortTextType" minOccurs="0"/>
+      <xs:element name="signed_at" type="xs:date" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ====================================================================== -->
+  <!-- 13. КОРНЕВОЙ ЭЛЕМЕНТ И ОГРАНИЧЕНИЯ ЦЕЛОСТНОСТИ                         -->
+  <!-- ====================================================================== -->
+
+  <xs:element name="technical_report">
+    <xs:annotation><xs:documentation>XML-представление технического отчёта (модель данных v3.8).</xs:documentation></xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="report" type="tr:ReportType"/>
+        <xs:element name="dictionary_snapshots" type="tr:DictionarySnapshotsType" minOccurs="0"/>
+
+        <xs:element name="specialists" minOccurs="0">
+          <xs:complexType><xs:sequence><xs:element name="specialist" type="tr:SpecialistType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        </xs:element>
+        <xs:element name="instruments" minOccurs="0">
+          <xs:complexType><xs:sequence><xs:element name="instrument" type="tr:InstrumentType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        </xs:element>
+        <xs:element name="reviewed_documents" minOccurs="0">
+          <xs:complexType><xs:sequence><xs:element name="reviewed_document" type="tr:ReviewedDocumentType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        </xs:element>
+        <xs:element name="work_scope" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="works">
+                <xs:complexType><xs:sequence><xs:element name="work" type="tr:WorkItemType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+
+        <xs:element name="equipment" minOccurs="0">
+          <xs:complexType><xs:sequence><xs:element name="equipment_item" type="tr:EquipmentType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        </xs:element>
+        <xs:element name="equipment_control_schemes" minOccurs="0">
+          <xs:complexType><xs:sequence><xs:element name="equipment_control_scheme" type="tr:EquipmentControlSchemeType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        </xs:element>
+        <xs:element name="method_statuses" minOccurs="0">
+          <xs:complexType><xs:sequence><xs:element name="method_status" type="tr:MethodStatusType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        </xs:element>
+        <xs:element name="protocols" minOccurs="0">
+          <xs:complexType><xs:sequence><xs:element name="protocol" type="tr:ProtocolType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        </xs:element>
+
+        <xs:element name="defects_statements" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="defects_statement" type="tr:DefectsStatementType" maxOccurs="unbounded">
+                <!-- item_no уникален в пределах ведомости (плотность 1..N — V-DS-009, вне XSD) -->
+                <xs:unique name="DefectsItemNoUnique">
+                  <xs:selector xpath="tr:items/tr:item"/>
+                  <xs:field xpath="tr:item_no"/>
+                </xs:unique>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="building_defects_statements" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="building_defects_statement" type="tr:BuildingDefectsStatementType" maxOccurs="unbounded">
+                <xs:unique name="BuildingItemNoUnique">
+                  <xs:selector xpath="tr:items/tr:item"/>
+                  <xs:field xpath="tr:item_no"/>
+                </xs:unique>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+
+        <xs:element name="photos" minOccurs="0">
+          <xs:complexType><xs:sequence><xs:element name="photo" type="tr:PhotoType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        </xs:element>
+        <xs:element name="conclusions" minOccurs="0">
+          <xs:complexType><xs:sequence><xs:element name="conclusion" type="tr:ConclusionType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        </xs:element>
+        <xs:element name="signatures" minOccurs="0">
+          <xs:complexType><xs:sequence><xs:element name="signature" type="tr:SignatureType" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="schema_version" type="xs:string" use="required" fixed="3.8"/>
+      <xs:attribute name="generated_at" type="xs:dateTime" use="optional"/>
+    </xs:complexType>
+
+    <!-- ===================== KEY: ключи справочников и сущностей ===================== -->
+    <xs:key name="SteelGradeKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:steel_grades/tr:steel_grade"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="EquipmentTypeAnyKey">
+      <xs:annotation><xs:documentation>Группы и листья — для parent_code.</xs:documentation></xs:annotation>
+      <xs:selector xpath="tr:dictionary_snapshots/tr:equipment_types/tr:equipment_type_group | tr:dictionary_snapshots/tr:equipment_types/tr:equipment_type"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="EquipmentTypeLeafKey">
+      <xs:annotation><xs:documentation>Только листья — для Equipment.equipment_type и прочих ссылок на тип ЕО (V-EQ-032).</xs:documentation></xs:annotation>
+      <xs:selector xpath="tr:dictionary_snapshots/tr:equipment_types/tr:equipment_type"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="EquipmentMarkKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:equipment_marks/tr:equipment_mark"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="ClimateExecutionKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:climate_executions/tr:climate_execution"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="WorkingMediumKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:working_media/tr:working_medium"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="ControlSchemeVariantKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:control_scheme_variants/tr:control_scheme_variant"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="ControlSchemeKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:control_schemes/tr:control_scheme"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="HardnessNormKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:hardness_norms/tr:hardness_norm"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="DtoirWorkTypeKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:dtoir_work_types/tr:dtoir_work_type"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="ChemicalElementKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:chemical_elements/tr:chemical_element"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="NtdKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:ntd_documents/tr:ntd"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="ControlMethodKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:control_methods/tr:control_method"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="AppendixTypeKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:appendix_types/tr:appendix_type"/>
+      <xs:field xpath="tr:code"/>
+    </xs:key>
+    <xs:key name="DictionarySnapshotKey">
+      <xs:annotation><xs:documentation>Dictionary_Versions: пара (dictionary_code, version) контейнера снимка.</xs:documentation></xs:annotation>
+      <xs:selector xpath="tr:dictionary_snapshots/*"/>
+      <xs:field xpath="@dictionary_code"/>
+      <xs:field xpath="@version"/>
+    </xs:key>
+    <xs:key name="EquipmentUidKey">
+      <xs:selector xpath="tr:equipment/tr:equipment_item"/>
+      <xs:field xpath="tr:eo_uid"/>
+    </xs:key>
+    <xs:key name="SpecialistKey">
+      <xs:selector xpath="tr:specialists/tr:specialist"/>
+      <xs:field xpath="tr:specialist_id"/>
+    </xs:key>
+    <xs:key name="InstrumentKey">
+      <xs:selector xpath="tr:instruments/tr:instrument"/>
+      <xs:field xpath="tr:instrument_id"/>
+    </xs:key>
+
+    <!-- ===================== UNIQUE ===================== -->
+    <!-- V-DIC-041: source_code уникален в паре (справочник, source_system) -->
+    <xs:unique name="SteelGradeSourceCodeUnique">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:steel_grades/tr:steel_grade"/>
+      <xs:field xpath="tr:source_system"/><xs:field xpath="tr:source_code"/>
+    </xs:unique>
+    <xs:unique name="EquipmentTypeSourceCodeUnique">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:equipment_types/tr:equipment_type_group | tr:dictionary_snapshots/tr:equipment_types/tr:equipment_type"/>
+      <xs:field xpath="tr:source_system"/><xs:field xpath="tr:source_code"/>
+    </xs:unique>
+    <xs:unique name="EquipmentMarkSourceCodeUnique">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:equipment_marks/tr:equipment_mark"/>
+      <xs:field xpath="tr:source_system"/><xs:field xpath="tr:source_code"/>
+    </xs:unique>
+    <xs:unique name="ClimateSourceCodeUnique">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:climate_executions/tr:climate_execution"/>
+      <xs:field xpath="tr:source_system"/><xs:field xpath="tr:source_code"/>
+    </xs:unique>
+    <xs:unique name="WorkingMediumSourceCodeUnique">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:working_media/tr:working_medium"/>
+      <xs:field xpath="tr:source_system"/><xs:field xpath="tr:source_code"/>
+    </xs:unique>
+    <xs:unique name="ControlSchemeSourceCodeUnique">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:control_schemes/tr:control_scheme"/>
+      <xs:field xpath="tr:source_system"/><xs:field xpath="tr:source_code"/>
+    </xs:unique>
+    <!-- V-DIC-043: уникальна пара (equipment_type_ref, name) -->
+    <xs:unique name="EquipmentMarkTypeNameUnique">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:equipment_marks/tr:equipment_mark"/>
+      <xs:field xpath="tr:equipment_type_ref"/><xs:field xpath="tr:name"/>
+    </xs:unique>
+    <!-- V-DIC-048: уникальна (variant_ref, control_method_ref, alternative_no); при отсутствии alternative_no (=1) кортеж не проверяется -->
+    <xs:unique name="ControlSchemeAlternativeUnique">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:control_schemes/tr:control_scheme"/>
+      <xs:field xpath="tr:variant_ref"/><xs:field xpath="tr:control_method_ref"/><xs:field xpath="tr:alternative_no"/>
+    </xs:unique>
+    <!-- V-DIC-050: уникальна (steel_grade_ref, part_scope, ntd_ref) -->
+    <xs:unique name="HardnessNormScopeUnique">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:hardness_norms/tr:hardness_norm"/>
+      <xs:field xpath="tr:steel_grade_ref"/><xs:field xpath="tr:part_scope"/><xs:field xpath="tr:ntd_ref"/>
+    </xs:unique>
+    <xs:unique name="ProtocolNumberUnique">
+      <xs:selector xpath="tr:protocols/tr:protocol/tr:metadata"/>
+      <xs:field xpath="tr:protocol_number"/>
+    </xs:unique>
+    <xs:unique name="PhotoIdUnique">
+      <xs:selector xpath="tr:photos/tr:photo"/>
+      <xs:field xpath="tr:photo_id"/>
+    </xs:unique>
+
+    <!-- ===================== KEYREF: ссылки на справочники ===================== -->
+    <xs:keyref name="EquipmentTypeParentRef" refer="tr:EquipmentTypeAnyKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:equipment_types/tr:equipment_type_group | tr:dictionary_snapshots/tr:equipment_types/tr:equipment_type"/>
+      <xs:field xpath="tr:parent_code"/>
+    </xs:keyref>
+    <xs:keyref name="EquipmentMarkTypeRef" refer="tr:EquipmentTypeLeafKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:equipment_marks/tr:equipment_mark"/>
+      <xs:field xpath="tr:equipment_type_ref"/>
+    </xs:keyref>
+    <xs:keyref name="EquipmentMarkVariantRef" refer="tr:ControlSchemeVariantKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:equipment_marks/tr:equipment_mark"/>
+      <xs:field xpath="tr:design_variant_ref"/>
+    </xs:keyref>
+    <xs:keyref name="WorkingMediumComponentRef" refer="tr:WorkingMediumKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:working_media/tr:working_medium/tr:component_refs/tr:component_ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+    <xs:keyref name="VariantEquipmentTypeRef" refer="tr:EquipmentTypeLeafKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:control_scheme_variants/tr:control_scheme_variant"/>
+      <xs:field xpath="tr:equipment_type_ref"/>
+    </xs:keyref>
+    <xs:keyref name="SchemeVariantRef" refer="tr:ControlSchemeVariantKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:control_schemes/tr:control_scheme"/>
+      <xs:field xpath="tr:variant_ref"/>
+    </xs:keyref>
+    <xs:keyref name="SchemeEquipmentTypeRef" refer="tr:EquipmentTypeLeafKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:control_schemes/tr:control_scheme"/>
+      <xs:field xpath="tr:equipment_type_ref"/>
+    </xs:keyref>
+    <xs:keyref name="SchemeMethodRef" refer="tr:ControlMethodKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:control_schemes/tr:control_scheme"/>
+      <xs:field xpath="tr:control_method_ref"/>
+    </xs:keyref>
+    <xs:keyref name="HardnessNormSteelRef" refer="tr:SteelGradeKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:hardness_norms/tr:hardness_norm"/>
+      <xs:field xpath="tr:steel_grade_ref"/>
+    </xs:keyref>
+    <xs:keyref name="HardnessNormNtdRef" refer="tr:NtdKey">
+      <xs:selector xpath="tr:dictionary_snapshots/tr:hardness_norms/tr:hardness_norm"/>
+      <xs:field xpath="tr:ntd_ref"/>
+    </xs:keyref>
+
+    <!-- Версии справочников отчёта → контейнеры снимков -->
+    <xs:keyref name="ReportDictionaryVersionRef" refer="tr:DictionarySnapshotKey">
+      <xs:selector xpath="tr:report/tr:dictionary_versions/tr:dictionary_version"/>
+      <xs:field xpath="tr:dictionary_code"/>
+      <xs:field xpath="tr:version"/>
+    </xs:keyref>
+    <xs:keyref name="ReportNtdRef" refer="tr:NtdKey">
+      <xs:selector xpath="tr:report/tr:applied_ntd/tr:ntd_ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+
+    <!-- Работы, ЕО -->
+    <xs:keyref name="WorkMethodRef" refer="tr:ControlMethodKey">
+      <xs:selector xpath="tr:work_scope/tr:works/tr:work"/>
+      <xs:field xpath="tr:control_method_ref"/>
+    </xs:keyref>
+    <xs:keyref name="EquipmentTypeRef" refer="tr:EquipmentTypeLeafKey">
+      <xs:selector xpath="tr:equipment/tr:equipment_item"/>
+      <xs:field xpath="tr:equipment_type"/>
+    </xs:keyref>
+    <xs:keyref name="EquipmentMarkRef" refer="tr:EquipmentMarkKey">
+      <xs:selector xpath="tr:equipment/tr:equipment_item"/>
+      <xs:field xpath="tr:mark_ref"/>
+    </xs:keyref>
+    <xs:keyref name="EquipmentClimateRef" refer="tr:ClimateExecutionKey">
+      <xs:selector xpath="tr:equipment/tr:equipment_item"/>
+      <xs:field xpath="tr:climate_execution_ref"/>
+    </xs:keyref>
+    <xs:keyref name="EquipmentSteelRef" refer="tr:SteelGradeKey">
+      <xs:selector xpath="tr:equipment/tr:equipment_item"/>
+      <xs:field xpath="tr:steel_grade_ref"/>
+    </xs:keyref>
+    <xs:keyref name="EquipmentWorkingMediumRef" refer="tr:WorkingMediumKey">
+      <xs:selector xpath="tr:equipment/tr:equipment_item/tr:working_mediums/tr:working_medium_ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+
+    <!-- Схемы контроля ЕО, статусы методов -->
+    <xs:keyref name="EqSchemeEoRef" refer="tr:EquipmentUidKey">
+      <xs:selector xpath="tr:equipment_control_schemes/tr:equipment_control_scheme"/>
+      <xs:field xpath="tr:eo_uid"/>
+    </xs:keyref>
+    <xs:keyref name="EqSchemeMethodRef" refer="tr:ControlMethodKey">
+      <xs:selector xpath="tr:equipment_control_schemes/tr:equipment_control_scheme"/>
+      <xs:field xpath="tr:control_method_ref"/>
+    </xs:keyref>
+    <xs:keyref name="EqSchemeSchemeRef" refer="tr:ControlSchemeKey">
+      <xs:selector xpath="tr:equipment_control_schemes/tr:equipment_control_scheme"/>
+      <xs:field xpath="tr:scheme_ref"/>
+    </xs:keyref>
+    <xs:keyref name="MethodStatusMethodRef" refer="tr:ControlMethodKey">
+      <xs:selector xpath="tr:method_statuses/tr:method_status"/>
+      <xs:field xpath="tr:method_ref"/>
+    </xs:keyref>
+    <xs:keyref name="MethodStatusEoRef" refer="tr:EquipmentUidKey">
+      <xs:selector xpath="tr:method_statuses/tr:method_status"/>
+      <xs:field xpath="tr:eo_uid"/>
+    </xs:keyref>
+
+    <!-- Протоколы -->
+    <xs:keyref name="ProtocolMethodRef" refer="tr:ControlMethodKey">
+      <xs:selector xpath="tr:protocols/tr:protocol"/>
+      <xs:field xpath="tr:control_method_ref"/>
+    </xs:keyref>
+    <xs:keyref name="ProtocolAppendixRef" refer="tr:AppendixTypeKey">
+      <xs:selector xpath="tr:protocols/tr:protocol"/>
+      <xs:field xpath="tr:appendix_type_ref"/>
+    </xs:keyref>
+    <xs:keyref name="ProtocolInstrumentRef" refer="tr:InstrumentKey">
+      <xs:selector xpath="tr:protocols/tr:protocol/tr:metadata/tr:instrument_refs/tr:ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+    <xs:keyref name="ProtocolSpecialistRef" refer="tr:SpecialistKey">
+      <xs:selector xpath="tr:protocols/tr:protocol/tr:metadata/tr:specialist_refs/tr:ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+    <xs:keyref name="ProtocolNtdRef" refer="tr:NtdKey">
+      <xs:selector xpath="tr:protocols/tr:protocol/tr:metadata/tr:ntd_refs/tr:ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+    <xs:keyref name="ProtocolEoRef" refer="tr:EquipmentUidKey">
+      <xs:selector xpath="tr:protocols/tr:protocol/tr:data/*/*/tr:eo_ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+    <xs:keyref name="HardnessNormRef" refer="tr:HardnessNormKey">
+      <xs:selector xpath="tr:protocols/tr:protocol/tr:data/tr:hardness_data/tr:equipment_hardness_data/tr:measurements/tr:measurement/tr:norm_ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+    <xs:keyref name="HardnessOverrideNtdRef" refer="tr:NtdKey">
+      <xs:selector xpath="tr:protocols/tr:protocol/tr:data/tr:hardness_data/tr:equipment_hardness_data/tr:measurements/tr:measurement/tr:override_ntd_ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+    <xs:keyref name="SpectralElementRef" refer="tr:ChemicalElementKey">
+      <xs:selector xpath="tr:protocols/tr:protocol/tr:data/tr:spectral_data/tr:equipment_spectral_data/tr:measurements/tr:measurement/tr:element_ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+    <xs:keyref name="SpectralSteelRef" refer="tr:SteelGradeKey">
+      <xs:selector xpath="tr:protocols/tr:protocol/tr:data/tr:spectral_data/tr:equipment_spectral_data/tr:identified_steel_grade_ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+    <xs:keyref name="GenericMediumRef" refer="tr:WorkingMediumKey">
+      <xs:selector xpath="tr:protocols/tr:protocol/tr:data/tr:generic_data/tr:equipment_result/tr:medium_ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+
+    <!-- Ведомости, фото, заключения, подписи -->
+    <xs:keyref name="DefectsStatementWorkTypeRef" refer="tr:DtoirWorkTypeKey">
+      <xs:selector xpath="tr:defects_statements/tr:defects_statement"/>
+      <xs:field xpath="tr:dtoir_work_type_ref"/>
+    </xs:keyref>
+    <xs:keyref name="DefectsStatementExtraWorkTypeRef" refer="tr:DtoirWorkTypeKey">
+      <xs:selector xpath="tr:defects_statements/tr:defects_statement/tr:work_types/tr:dtoir_work_type_ref"/>
+      <xs:field xpath="."/>
+    </xs:keyref>
+    <xs:keyref name="DefectsStatementCompilerRef" refer="tr:SpecialistKey">
+      <xs:selector xpath="tr:defects_statements/tr:defects_statement"/>
+      <xs:field xpath="tr:compiler_specialist_ref"/>
+    </xs:keyref>
+    <xs:keyref name="DefectsItemEoRef" refer="tr:EquipmentUidKey">
+      <xs:selector xpath="tr:defects_statements/tr:defects_statement/tr:items/tr:item"/>
+      <xs:field xpath="tr:eo_uid"/>
+    </xs:keyref>
+    <xs:keyref name="BuildingStatementNtdRef" refer="tr:NtdKey">
+      <xs:selector xpath="tr:building_defects_statements/tr:building_defects_statement"/>
+      <xs:field xpath="tr:ntd_ref"/>
+    </xs:keyref>
+    <xs:keyref name="PhotoEoRef" refer="tr:EquipmentUidKey">
+      <xs:selector xpath="tr:photos/tr:photo"/>
+      <xs:field xpath="tr:eo_uid"/>
+    </xs:keyref>
+    <xs:keyref name="PhotoMethodRef" refer="tr:ControlMethodKey">
+      <xs:selector xpath="tr:photos/tr:photo"/>
+      <xs:field xpath="tr:method_ref"/>
+    </xs:keyref>
+    <xs:keyref name="PhotoAppendixRef" refer="tr:AppendixTypeKey">
+      <xs:selector xpath="tr:photos/tr:photo"/>
+      <xs:field xpath="tr:appendix_type"/>
+    </xs:keyref>
+    <xs:keyref name="ConclusionMethodRef" refer="tr:ControlMethodKey">
+      <xs:selector xpath="tr:conclusions/tr:conclusion"/>
+      <xs:field xpath="tr:method_ref"/>
+    </xs:keyref>
+    <xs:keyref name="SignatureSpecialistRef" refer="tr:SpecialistKey">
+      <xs:selector xpath="tr:signatures/tr:signature"/>
+      <xs:field xpath="tr:specialist_ref"/>
+    </xs:keyref>
+  </xs:element>
+
+</xs:schema>

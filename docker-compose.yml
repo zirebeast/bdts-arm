@@ -1,0 +1,170 @@
+# МП-3.5 «БДТС» — стенд MVP (одна ВМ). Сервисы stateless (api, worker, web) масштабируются репликами; данные — в томах.
+name: bdts
+
+x-backend-env: &backend-env
+  ENVIRONMENT: ${ENVIRONMENT:-test}
+  DATABASE_URL: postgresql+asyncpg://bdts:${POSTGRES_PASSWORD}@postgres:5432/bdts
+  AUTH_MODE: keycloak
+  OIDC_INTERNAL_URL: http://keycloak:8080/auth/realms/bdts
+  OIDC_ISSUERS: ${OIDC_ISSUERS}
+  OIDC_AUDIENCE: bdts-api
+  S3_ENDPOINT: s3:8333
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+  S3_SECRET_KEY: ${S3_SECRET_KEY}
+  S3_BUCKET: bdts
+  RABBITMQ_URL: amqp://bdts:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+  REDIS_URL: redis://redis:6379/0
+  SEED_ON_START: "false"
+  ADAPTER_PLAN: mock
+  ADAPTER_BDO: mock
+  ADAPTER_REPORT_SINK: mock
+  ADAPTER_DIAG_SINK: mock
+  ADAPTER_PS0: mock
+  ADAPTER_NOTIFIER: mock
+
+services:
+  postgres:
+    image: postgres:15.19-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bdts
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: bdts
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=200", "-c", "effective_cache_size=768MB"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bdts -d bdts"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    deploy: { resources: { limits: { memory: 768m } } }
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    deploy: { resources: { limits: { memory: 96m } } }
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: bdts
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes: [rabbitdata:/var/lib/rabbitmq]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    deploy: { resources: { limits: { memory: 320m } } }
+
+  s3:
+    # S3-совместимое объектное хранилище (SeaweedFS, Apache-2.0). Образы MinIO community больше не публикуются;
+    # бэкенд работает по протоколу S3 и не зависит от реализации хранилища.
+    image: chrislusf/seaweedfs:3.80
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        printf '{"identities":[{"name":"bdts","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" > /tmp/s3.json &&
+        exec weed server -dir=/data -ip=s3 -ip.bind=0.0.0.0 -master.volumeSizeLimitMB=1024 -volume.max=50 -s3 -s3.port=8333 -s3.config=/tmp/s3.json
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+    volumes: [s3data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    deploy: { resources: { limits: { memory: 384m } } }
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    restart: unless-stopped
+    command: ["start", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: bdts
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      DEMO_PASSWORD: ${DEMO_PASSWORD}
+      PUBLIC_URLS: ${PUBLIC_URLS}
+      JAVA_OPTS_KC_HEAP: "-Xms192m -Xmx448m"
+    volumes:
+      - ./infra/keycloak/realm-bdts.json:/opt/keycloak/data/import/realm-bdts.json:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    deploy: { resources: { limits: { memory: 768m } } }
+
+  migrate:
+    build: ./backend
+    image: bdts-backend:latest
+    environment: *backend-env
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed.run"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      s3: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    image: bdts-backend:latest
+    restart: unless-stopped
+    environment: *backend-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/ready', timeout=4)"]
+      interval: 15s
+      timeout: 6s
+      retries: 10
+    deploy: { resources: { limits: { memory: 512m } } }
+
+  worker:
+    image: bdts-backend:latest
+    restart: unless-stopped
+    environment: *backend-env
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+    deploy: { resources: { limits: { memory: 256m } } }
+
+  web:
+    build: ./frontend
+    image: bdts-web:latest
+    restart: unless-stopped
+    deploy: { resources: { limits: { memory: 64m } } }
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      SITE_HOSTS: ${SITE_HOSTS}
+      PRIMARY_HOST: ${PRIMARY_HOST}
+      PUBLIC_IP: ${PUBLIC_IP:-127.0.0.1}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on: [web, api, keycloak]
+    deploy: { resources: { limits: { memory: 128m } } }
+
+volumes:
+  pgdata:
+  rabbitdata:
+  s3data:
+  caddydata:
+  caddyconfig:

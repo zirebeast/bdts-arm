@@ -1,0 +1,637 @@
+{
+  "realm": "bdts",
+  "enabled": true,
+  "displayName": "МП-3.5 «БДТС»",
+  "displayNameHtml": "<div style='font-weight:600'>ЕЦП ДТОиР · МП-3.5 «БДТС»</div>",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": true,
+  "loginWithEmailAllowed": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "ru"
+  ],
+  "defaultLocale": "ru",
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 3600,
+  "ssoSessionMaxLifespan": 36000,
+  "bruteForceProtected": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "BDTS.ORGWORK",
+        "description": "БДТС. Ответственный за организацию работ"
+      },
+      {
+        "name": "BDTS.SOGLZAD",
+        "description": "БДТС. Ответственный за согласование Задания на ДО"
+      },
+      {
+        "name": "BDTS.POLEV",
+        "description": "БДТС. Исполнитель полевых работ"
+      },
+      {
+        "name": "BDTS.KAMER",
+        "description": "БДТС. Исполнитель камеральных работ"
+      },
+      {
+        "name": "BDTS.SOGLTECH",
+        "description": "БДТС. Ответственный за согласование Технического отчета"
+      },
+      {
+        "name": "BDTS.OTVTECHOT",
+        "description": "БДТС. Ответственный за работу с Техническим отчетом"
+      },
+      {
+        "name": "BDTS.OTVTS",
+        "description": "БДТС. Ответственный ДЭО за контроль технического состояния"
+      },
+      {
+        "name": "BDTS.TO_UPLOAD",
+        "description": "Загрузка ТО XSD v3.8 (Роль 7.1, ГД)"
+      },
+      {
+        "name": "BDTS.PLANNER",
+        "description": "Планирование ДО (Роли 1, 2)"
+      },
+      {
+        "name": "BDTS.ADMIN",
+        "description": "Администратор модуля и НСИ"
+      },
+      {
+        "name": "BDTS.VIEWER",
+        "description": "Только просмотр"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "БДТС: Организация работ",
+      "realmRoles": [
+        "BDTS.ORGWORK"
+      ]
+    },
+    {
+      "name": "БДТС: Согласование задания",
+      "realmRoles": [
+        "BDTS.SOGLZAD"
+      ]
+    },
+    {
+      "name": "БДТС: Полевые работы",
+      "realmRoles": [
+        "BDTS.POLEV"
+      ]
+    },
+    {
+      "name": "БДТС: Камеральные работы",
+      "realmRoles": [
+        "BDTS.KAMER"
+      ]
+    },
+    {
+      "name": "БДТС: Согласование ТО",
+      "realmRoles": [
+        "BDTS.SOGLTECH"
+      ]
+    },
+    {
+      "name": "БДТС: Работа с ТО (ДЭО)",
+      "realmRoles": [
+        "BDTS.OTVTECHOT"
+      ]
+    },
+    {
+      "name": "БДТС: Контроль ТС (ДЭО)",
+      "realmRoles": [
+        "BDTS.OTVTS"
+      ]
+    },
+    {
+      "name": "БДТС: Загрузка ТО",
+      "realmRoles": [
+        "BDTS.TO_UPLOAD"
+      ]
+    },
+    {
+      "name": "БДТС: Планирование",
+      "realmRoles": [
+        "BDTS.PLANNER"
+      ]
+    },
+    {
+      "name": "БДТС: Администратор",
+      "realmRoles": [
+        "BDTS.ADMIN"
+      ]
+    },
+    {
+      "name": "БДТС: Просмотр",
+      "realmRoles": [
+        "BDTS.VIEWER"
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "bdts-web",
+      "name": "МП-3.5 БДТС (веб)",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "redirectUris": [
+        "https://37-235-241-108.sslip.io/*",
+        "https://arm.gmtry.pw/*",
+        "https://stand1.geometry-dev.ru/*",
+        "http://localhost:5173/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://37-235-241-108.sslip.io/*##https://arm.gmtry.pw/*##https://stand1.geometry-dev.ru/*##http://localhost:5173/*"
+      },
+      "fullScopeAllowed": true,
+      "protocolMappers": [
+        {
+          "name": "deo",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "deo",
+            "claim.name": "deo",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "fio",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "fio",
+            "claim.name": "fio",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "position",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "position",
+            "claim.name": "position",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "bdts-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "bdts-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "demo",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Демо",
+      "lastName": "Пользователь",
+      "email": "demo@bdts.local",
+      "attributes": {
+        "deo": [
+          ""
+        ],
+        "fio": [
+          "Демо Пользователь"
+        ],
+        "position": [
+          ""
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.SOGLTECH",
+        "BDTS.POLEV",
+        "BDTS.SOGLZAD",
+        "BDTS.KAMER",
+        "BDTS.OTVTECHOT",
+        "BDTS.TO_UPLOAD",
+        "BDTS.OTVTS",
+        "BDTS.ORGWORK",
+        "BDTS.PLANNER",
+        "BDTS.ADMIN"
+      ],
+      "groups": [
+        "/БДТС: Согласование ТО",
+        "/БДТС: Полевые работы",
+        "/БДТС: Согласование задания",
+        "/БДТС: Камеральные работы",
+        "/БДТС: Работа с ТО (ДЭО)",
+        "/БДТС: Загрузка ТО",
+        "/БДТС: Контроль ТС (ДЭО)",
+        "/БДТС: Организация работ",
+        "/БДТС: Планирование",
+        "/БДТС: Администратор"
+      ]
+    },
+    {
+      "username": "gd.org",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_1",
+      "lastName": "-",
+      "email": "gd.org@bdts.local",
+      "attributes": {
+        "deo": [
+          ""
+        ],
+        "fio": [
+          "ФИО_1"
+        ],
+        "position": [
+          "Начальник отдела организации работ"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.ORGWORK"
+      ],
+      "groups": [
+        "/БДТС: Организация работ"
+      ]
+    },
+    {
+      "username": "gd.sogl",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_2",
+      "lastName": "-",
+      "email": "gd.sogl@bdts.local",
+      "attributes": {
+        "deo": [
+          "ОРГ_9"
+        ],
+        "fio": [
+          "ФИО_2"
+        ],
+        "position": [
+          ""
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.SOGLZAD"
+      ],
+      "groups": [
+        "/БДТС: Согласование задания"
+      ]
+    },
+    {
+      "username": "gd.pole",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_3",
+      "lastName": "-",
+      "email": "gd.pole@bdts.local",
+      "attributes": {
+        "deo": [
+          "ОРГ_9"
+        ],
+        "fio": [
+          "ФИО_3"
+        ],
+        "position": [
+          ""
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.POLEV"
+      ],
+      "groups": [
+        "/БДТС: Полевые работы"
+      ]
+    },
+    {
+      "username": "gd.kamer",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_4",
+      "lastName": "-",
+      "email": "gd.kamer@bdts.local",
+      "attributes": {
+        "deo": [
+          "ОРГ_9"
+        ],
+        "fio": [
+          "ФИО_4"
+        ],
+        "position": [
+          ""
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.KAMER"
+      ],
+      "groups": [
+        "/БДТС: Камеральные работы"
+      ]
+    },
+    {
+      "username": "gd.soglto",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_5",
+      "lastName": "-",
+      "email": "gd.soglto@bdts.local",
+      "attributes": {
+        "deo": [
+          "ОРГ_9"
+        ],
+        "fio": [
+          "ФИО_5"
+        ],
+        "position": [
+          ""
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.SOGLTECH"
+      ],
+      "groups": [
+        "/БДТС: Согласование ТО"
+      ]
+    },
+    {
+      "username": "deo.to",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_6",
+      "lastName": "-",
+      "email": "deo.to@bdts.local",
+      "attributes": {
+        "deo": [
+          "ОРГ_9"
+        ],
+        "fio": [
+          "ФИО_6"
+        ],
+        "position": [
+          ""
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.OTVTECHOT"
+      ],
+      "groups": [
+        "/БДТС: Работа с ТО (ДЭО)"
+      ]
+    },
+    {
+      "username": "deo.ts",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_7",
+      "lastName": "-",
+      "email": "deo.ts@bdts.local",
+      "attributes": {
+        "deo": [
+          "ОРГ_9"
+        ],
+        "fio": [
+          "ФИО_7"
+        ],
+        "position": [
+          "Инженер по диагностике"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.OTVTS"
+      ],
+      "groups": [
+        "/БДТС: Контроль ТС (ДЭО)"
+      ]
+    },
+    {
+      "username": "gd.upload",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_8",
+      "lastName": "-",
+      "email": "gd.upload@bdts.local",
+      "attributes": {
+        "deo": [
+          ""
+        ],
+        "fio": [
+          "ФИО_8"
+        ],
+        "position": [
+          ""
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.TO_UPLOAD"
+      ],
+      "groups": [
+        "/БДТС: Загрузка ТО"
+      ]
+    },
+    {
+      "username": "deo.plan",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_9",
+      "lastName": "-",
+      "email": "deo.plan@bdts.local",
+      "attributes": {
+        "deo": [
+          ""
+        ],
+        "fio": [
+          "ФИО_9"
+        ],
+        "position": [
+          ""
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.PLANNER"
+      ],
+      "groups": [
+        "/БДТС: Планирование"
+      ]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_10",
+      "lastName": "-",
+      "email": "admin@bdts.local",
+      "attributes": {
+        "deo": [
+          ""
+        ],
+        "fio": [
+          "ФИО_10"
+        ],
+        "position": [
+          ""
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.ADMIN"
+      ],
+      "groups": [
+        "/БДТС: Администратор"
+      ]
+    },
+    {
+      "username": "viewer",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "ФИО_11",
+      "lastName": "-",
+      "email": "viewer@bdts.local",
+      "attributes": {
+        "deo": [
+          ""
+        ],
+        "fio": [
+          "ФИО_11"
+        ],
+        "position": [
+          ""
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BDTS.VIEWER"
+      ],
+      "groups": [
+        "/БДТС: Просмотр"
+      ]
+    }
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}, \"username-prohibited-characters\": {}, \"up-username-not-idn-homograph\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"validations\": {\"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"validations\": {\"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}], \"groups\": [{\"name\": \"user-metadata\", \"displayHeader\": \"User metadata\", \"displayDescription\": \"Attributes, which refer to user metadata\"}], \"unmanagedAttributePolicy\": \"ENABLED\"}"
+          ]
+        }
+      }
+    ]
+  }
+}

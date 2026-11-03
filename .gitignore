@@ -1,0 +1,22 @@
+# Секреты и локальные данные
+.env
+*.local.md
+backend/data/
+*.db
+
+# Зависимости и сборка
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Прочее
+*.log
+*.tgz
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

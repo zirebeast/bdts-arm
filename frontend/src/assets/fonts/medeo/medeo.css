@@ -1,0 +1,6 @@
+/* Medeo Sans / Medeo Mono (OFL-1.1, см. OFL.txt), github.com/DNFDEVS/medeo-font @ 72c9ca7.
+   Файлы лежат в проекте и попадают в сборку — интерфейс не обращается за шрифтами во внешнюю сеть. */
+@font-face { font-family: "Medeo Sans"; src: url("./MedeoSansVariable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Medeo Sans"; src: url("./MedeoSansVariable-Italic.woff2") format("woff2"); font-weight: 100 900; font-style: italic; font-display: swap; }
+@font-face { font-family: "Medeo Mono"; src: url("./MedeoMonoVariable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Medeo Mono"; src: url("./MedeoMonoVariable-Italic.woff2") format("woff2"); font-weight: 100 900; font-style: italic; font-display: swap; }

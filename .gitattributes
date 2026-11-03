@@ -1,0 +1,7 @@
+# Файлы деплоя исполняются в Linux: всегда LF, в том числе при клонировании на Windows
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary
+*.docx binary
+*.xlsx binary

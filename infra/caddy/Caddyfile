@@ -1,0 +1,27 @@
+# Доступ по IP по HTTP перенаправляется на HTTPS-имя (OIDC PKCE требует защищённый контекст браузера)
+http://{$PUBLIC_IP:127.0.0.1} {
+	redir https://{$PRIMARY_HOST}{uri} permanent
+}
+
+{$SITE_HOSTS} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle /auth/* {
+		reverse_proxy keycloak:8080
+	}
+	handle {
+		reverse_proxy web:80
+	}
+	log {
+		output stdout
+		format console
+	}
+}
